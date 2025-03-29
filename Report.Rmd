@@ -7,11 +7,12 @@ output:
 urlcolor: blue
 ---
 
-```{r setup, include = FALSE}
+```{r setup, include = TRUE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, error = TRUE)
 library(tidyverse)
 theme_set(theme_bw())
 require(extraDistr) #need for rdunif
+library(dplyr)
 ```
 
 # Introduction
@@ -19,6 +20,29 @@ require(extraDistr) #need for rdunif
 
 
 # Literature Review
+
+
+# Dataset and Data Cleaning
+Dataset Name: Crude Suicide Rate (Per 100,000 Population)
+Source: https://www.who.int/data/gho/data/themes/mental-health/suicide-rates
+Description: The raw dataset has notable features like country, age group, sex, and suicide rate (per 100,000 people) that can be extracted.
+
+Location: Country name
+Period: Year 2019
+Dim1: Sex ("Female", "Both sexes", "Male)
+Dim2: Age group (15-29 years, 30-49 years)
+
+```{r}
+data_raw = read.csv("old_young.csv", header = TRUE)
+head(data_raw)
+data = data_raw |> select(Location, Period, Dim1, Dim2)
+head(data)
+unique(data$Dim2)
+```
+
+# Data Analysis
+
+
 
 
 
