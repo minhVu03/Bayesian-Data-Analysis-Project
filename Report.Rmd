@@ -1,0 +1,24 @@
+---
+title: "Bayesian Data Analysis Project"
+output: 
+  bookdown::pdf_document2:
+    number_sections: false
+    toc: FALSE
+urlcolor: blue
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, error = TRUE)
+library(tidyverse)
+theme_set(theme_bw())
+require(extraDistr) #need for rdunif
+```
+
+# Introduction
+
+
+
+# Literature Review
+
+
+
