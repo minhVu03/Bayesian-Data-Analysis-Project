@@ -35,9 +35,19 @@ Dim2: Age group (15-29 years, 30-49 years)
 ```{r}
 data_raw = read.csv("old_young.csv", header = TRUE)
 head(data_raw)
-data = data_raw |> select(Location, Period, Dim1, Dim2)
+data = as.data.frame(data_raw |> select(Location, Period, Dim1, Dim2))
 head(data)
 unique(data$Dim2)
+```
+Separate dataset into two age groups: "15-29 years" and "30-49 years"
+```{r}
+suicide_rate_1529 <- data |> filter(Dim2 == "15-29  years") #THERES AN EXTRA SPACE
+
+suicide_rate_3049 <- data |> filter(Dim2 == "30-49 years")
+
+suicide_rate_1529 #CAN BE FILTERED INTO EACH SEX TOO
+suicide_rate_3049
+
 ```
 
 # Data Analysis
