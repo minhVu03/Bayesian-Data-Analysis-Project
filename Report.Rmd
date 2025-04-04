@@ -16,7 +16,11 @@ library(dplyr)
 ```
 
 # Introduction
+In our world today, mental health has become more crucial and suicide remains a significant public health concern worldwide, with rates varying across regions due to complex social, economic, and cultural factors. Therefore, understanding the geographic distribution of suicide rates is important for the development of targeted mental health policies and prevention strategies. Although where we live in the world largely affects our mental and physical lifestyles, there has not been many studies done on the geographical characteristics of suicide rates and mental well-being.
 
+In this study, we apply a Bayesian hierarchical model with a conditionally autoregressive (CAR) prior to investigate spatial patterns in suicide rates across countries, stratified by sex groups. We will be using a Poisson likelihood to obtain a prior distribution. After which, inferential analysis will be done using Monte Carlo Markov Chain (MCMC) done in Stan.
+
+This approach allows us to identify high-risk regions, quantify uncertainty, and better understand how neighboring countries may influence each other’s suicide rates, providing valuable insights for data-informed mental health interventions.
 
 
 # Literature Review
