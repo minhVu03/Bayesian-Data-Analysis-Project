@@ -7,6 +7,8 @@ output:
 urlcolor: blue
 ---
 
+add group members names: ...
+
 ```{r setup, include = TRUE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, error = TRUE)
 library(tidyverse)
@@ -16,11 +18,11 @@ library(dplyr)
 ```
 
 # Introduction
-In our world today, mental health has become more crucial and suicide remains a significant public health concern worldwide, with rates varying across regions due to complex social, economic, and cultural factors. Therefore, understanding the geographic distribution of suicide rates is important for the development of targeted mental health policies and prevention strategies. Although where we live in the world largely affects our mental and physical lifestyles, there has not been many studies done on the geographical characteristics of suicide rates and mental well-being.
+In our world today, mental health has become more crucial and suicide remains a significant public health concern worldwide, with rates varying across regions due to complex social, economic, and cultural factors. Therefore, understanding the geographic distribution of suicide rates is important for the development of targeted mental health policies and preventative measures. Although where we live in the world largely affects our mental and physical lifestyles, there has not been many studies done on the geographical characteristics of suicide rates and mental well-being.
 
 In this study, we apply a Bayesian hierarchical model with a conditionally autoregressive (CAR) prior to investigate spatial patterns in suicide rates across countries, stratified by sex groups. We will be using a Poisson likelihood to obtain a prior distribution. After which, inferential analysis will be done using Monte Carlo Markov Chain (MCMC) done in Stan.
 
-This research specifically focuses on two recent years,2019 and 2021, to investigate any observable changes in suicide patterns potentially influenced by global events like the COVID-19 pandemic. Our main research question is: Are there identifiable spatial clusters of high suicide rates, and do these clusters differ by sex? 
+This research specifically focuses on two recent years,2019 and 2021, to investigate any observable changes in suicide patterns potentially influenced by global events like the COVID-19 pandemic. Our main research question is: Are there identifiable spatial clusters of high suicide rates, and do these rates differ between 2019 and 2021?
 
 This approach allows us to identify high-risk regions, quantify uncertainty, and better understand how neighboring countries may influence each other’s suicide rates, providing valuable insights for data-informed mental health interventions.
 
@@ -37,7 +39,7 @@ Location: Country name
 Period: Year
 Dim1: Sex ("Female", "Both sexes", "Male)
 FactValueNumeric: Number of suicide deaths in a year, divided by the population and multiplied by 100 000 (as indicated in the original data source)
-FactValueNumericLow: Low estimate 
+FactValueNumericLow: Low estimate
 FactValueNumericHigh: High estimate
 
 Note: The FactValueNumeric data are estimates of the number of suicides. "The estimates are derived from the WHO Global Health Estimates (GHE)" [data source]. However, some countries may not have an accurate way of recording the exact number of deaths, potentially leading to inaccurate estimations. Hence there is a high and low in the death rates.
@@ -46,10 +48,18 @@ Note: The FactValueNumeric data are estimates of the number of suicides. "The es
 ```{r}
 data_raw = read.csv("suicide_rate_raw.csv", header = TRUE)
 head(data_raw)
-data = as.data.frame(data_raw |> select(Location, Period, Dim1, FactValueNumeric, FactValueNumericLow, FactValueNumericHigh))
-head(data)
+#filter out "both sexes" to avoid duplication
+data = as.data.frame(data_raw |> select(Location, Period, Dim1, FactValueNumeric, FactValueNumericLow, FactValueNumericHigh) |> filter(Dim1 %in% c("Female", "Male")))
 unique(data$Period)
+unique(data$Location)
+head(data)
+nrow(data)
+max(data$FactValueNumeric)
+min(data$FactValueNumeric)
+
 ```
+The dataset consists of 8140 observations.
+
 filter data to only include 2019 and 2021
 ```{r}
 suicide_2019 <- filter(data, Period == 2019)
@@ -60,6 +70,23 @@ suicide_2021 <- filter(data, Period == 2021)
 # Data Analysis
 As we have obtained the cleaned data for suicide rates in 2019 and 2021, we can now declare a prior model from information obtained historically.
 
+## Prior Formulation and CAR Implementation (Jana do this)
+
+## Likelihood
+
+## Full Model
 
 
+```{r}
+# Assuming 'data' has columns: Period (2019 or 2021), Location, FactValueNumeric
+data$Region <- as.factor(data$Location)
+data$Time <- ifelse(data$Period == 2021, 1, 0)
 
+stan_data <- list(
+  N = nrow(data),
+  y = data$FactValueNumeric,
+  time = data$Time,
+  R = length(unique(data$Region)),
+  region = as.numeric(data$Region)
+)
+```
