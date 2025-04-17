@@ -7,7 +7,7 @@ output:
 urlcolor: blue
 ---
 
-add group members names: ...
+Members: Minh and Jana
 
 ```{r setup, include = TRUE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, error = TRUE)
@@ -15,6 +15,33 @@ library(tidyverse)
 theme_set(theme_bw())
 require(extraDistr) #need for rdunif
 library(dplyr)
+suppressPackageStartupMessages(require(rstan))
+
+#libraries for spatial data objects
+#install these packages if they're not already installed :)
+#install.packages(c("sf", "spdep", "rgdal")) #sf for vector datam-> shapefile
+#install.packages("terra")   # for raster data
+required_packages <- c("sf", "spdep", "terra", "dplyr", "readr", "rnaturalearth", "rnaturalearthdata")
+installed_packages <- rownames(installed.packages())
+
+for (pkg in required_packages) {
+  if (!(pkg %in% installed_packages)) {
+    install.packages(pkg)
+  }
+}
+
+library(sf)
+library(spdep)
+library(terra)
+library(dplyr)
+library(readr)
+library(rnaturalearth)
+library(rnaturalearthdata) 
+
+#For fuzzy matching rnaturalearthdata country names to our dataset's country names
+install.packages("fuzzyjoin")
+library(fuzzyjoin)
+
 ```
 
 # Introduction
@@ -28,7 +55,7 @@ This approach allows us to identify high-risk regions, quantify uncertainty, and
 
 
 # Literature Review
-
+## TO DO
 
 # Dataset and Data Cleaning
 Dataset Name: Crude Suicide Rate (Per 100,000 Population)
@@ -52,8 +79,6 @@ head(data_raw)
 data = as.data.frame(data_raw |> select(Location, Period, Dim1, FactValueNumeric, FactValueNumericLow, FactValueNumericHigh) |> filter(Dim1 %in% c("Female", "Male")))
 unique(data$Period)
 unique(data$Location)
-head(data)
-nrow(data)
 max(data$FactValueNumeric)
 min(data$FactValueNumeric)
 
@@ -70,23 +95,122 @@ suicide_2021 <- filter(data, Period == 2021)
 # Data Analysis
 As we have obtained the cleaned data for suicide rates in 2019 and 2021, we can now declare a prior model from information obtained historically.
 
-## Prior Formulation and CAR Implementation (Jana do this)
+## Explanation of priors
+... Numbers in the parameters list in stan code
 
-## Likelihood
+## Get adjacency pairs
+Firstly we need to know which countries are neighbours of each other
+```{r}
+# Load world country boundaries as an sf object
+world_sf <- ne_countries(scale = "medium", returnclass = "sf")
+world_sf <- st_make_valid(world_sf)
+world_sp <- as(world_sf, "Spatial")
+```
 
-## Full Model
-
+During the data analysis process we realized that the country names in our dataset did not match with the country names of the rnaturalearthdata dataset that we are using to model the spatial data. This led to the model mistaking the countries as having no neighbours and producing nodes with values 0.
+To solve this, we used fuzzy matching to match the unique country values in world_sf$admin with the country names in our WHO dataset. 
 
 ```{r}
-# Assuming 'data' has columns: Period (2019 or 2021), Location, FactValueNumeric
-data$Region <- as.factor(data$Location)
-data$Time <- ifelse(data$Period == 2021, 1, 0)
+# unique(data$Location)
+# unique(world_sf$admin)
 
+data_cleaned <- data %>%
+  mutate(Location = case_when(
+    Location == "Viet Nam" ~ "Vietnam",
+    Location == "Türkiye" ~ "Turkey",
+    Location == "Iran (Islamic Republic of)" ~ "Iran",
+    Location == "Russian Federation" ~ "Russia",
+    Location == "Republic of Korea" ~ "South Korea",
+    Location == "United Republic of Tanzania" ~ "Tanzania",
+    Location == "Syrian Arab Republic" ~ "Syria",
+    Location == "Brunei Darussalam" ~ "Brunei",
+    Location == "Czechia" ~ "Czech Republic",
+    Location == "Republic of Moldova" ~ "Moldova",
+    Location == "Lao People's Democratic Republic" ~ "Laos",
+    Location == "United Kingdom of Great Britain and Northern Ireland" ~ "United Kingdom",
+    Location == "United States of America" ~ "United States",
+    Location == "Venezuela (Bolivarian Republic of)" ~ "Venezuela",
+    Location == "Bolivia (Plurinational State of)" ~ "Bolivia",
+    Location == "Democratic People's Republic of Korea" ~ "North Korea",
+    Location == "Micronesia (Federated States of)" ~ "Federated States of Micronesia",
+    Location == "Cote d'Ivoire" ~ "Ivory Coast",
+    Location == "Eswatini" ~ "eSwatini",
+    Location == "Timor-Leste" ~ "East Timor",
+    Location == "occupied Palestinian territory, including east Jerusalem" ~ "Palestine",
+    Location == "Sao Tome and Principe" ~ "São Tomé and Principe",
+    TRUE ~ Location  # keep all other names unchanged
+  ))
+
+
+```
+
+Now we can join the two datasets so our original dataset will have adjacency parameters from world_sf
+```{r}
+world_merged <- world_sf %>%
+  left_join(data_cleaned, by = c("admin" = "Location"))
+
+neighbors <- poly2nb(world_sp, row.names = world_sf$admin)
+
+no_neighbors <- which(sapply(neighbors, length) == 0)
+if (length(no_neighbors) > 0) {
+  world_sf <- world_sf[-no_neighbors, ]
+  world_sp <- as(world_sf, "Spatial")
+  neighbors <- poly2nb(world_sp)
+}
+
+```
+
+## Convert Neighbor List to Adjacency Pairs
+```{r}
+#Make the CAR inputs for Stan
+#neighbor list to adjacency pairs(node1, node2)
+node1 <- c()
+node2 <- c()
+for (i in 1:length(neighbors)) {
+  for (j in neighbors[[i]]) {
+    node1 <- c(node1, i)
+    node2 <- c(node2, j)
+  }
+}
+
+any(node2==0)
+
+num_neighbors <- sapply(neighbors, length)
+R <- length(neighbors)
+
+data_matched <- data_cleaned %>%
+  left_join(world_sf %>% st_drop_geometry() %>% select(admin), by = c("Location" = "admin")) %>%
+  mutate(region_idx = match(Location, world_sf$admin)) %>%
+  filter(!is.na(region_idx))
+
+```
+
+## STAN Data List
+```{r}
 stan_data <- list(
-  N = nrow(data),
-  y = data$FactValueNumeric,
-  time = data$Time,
-  R = length(unique(data$Region)),
-  region = as.numeric(data$Region)
+  N = nrow(data_matched),
+  y = data_matched$FactValueNumeric,
+  time = as.integer(data_matched$Period == 2021),
+  R = R,
+  region = data_matched$region_idx,
+  N_edges = length(node1),
+  node1 = node1,
+  node2 = node2,
+  num_neighbors = num_neighbors
 )
 ```
+
+
+Extract posterior data from STAN code file
+Code reference: https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html
+Why use iter = 2000 and chains = 4:
+```{r}
+#setwd("C:/Users/Minh/OneDrive/Documents/Bayesian-Data-Analysis-Project")
+model <- stan_model(file = "model.stan")
+fit <- sampling(model, data = stan_data, iter = 2000, chains = 4, seed = 123)
+print(fit)
+```
+
+
+
+
