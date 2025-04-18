@@ -152,22 +152,36 @@ data_cleaned <- data %>%
 Now we can join the two datasets so our original dataset will have adjacency parameters from world_sf
 ```{r}
 #From rnaturalearth dataset
-world_sf <- ne_countries(scale = "medium", returnclass = "sf") %>%
-  st_make_valid() %>%
-  filter(admin %in% data_cleaned$Location) %>%
-  arrange(admin)  # ensure a consistent order
+world_sf <- ne_countries(scale = "medium", returnclass = "sf")
+world_sf <- st_make_valid(world_sf)
 
-# Assign a clean 1-based index
-world_sf$region_id <- 1:nrow(world_sf)
+# Fix name mismatches in data_cleaned first (your prior step)
+# Then filter world_sf to match data
+world_sf <- world_sf %>%
+  filter(admin %in% data_cleaned$Location)
 
+# Convert to spatial object
+world_sp <- as(world_sf, "Spatial")
+
+# Get neighbors
+neighbors <- poly2nb(world_sp, row.names = world_sf$admin)
+
+
+#STUFF GETS REMOVED
+no_neighbors <- which(sapply(neighbors, length) == 0)
+if (length(no_neighbors) > 0) {
+  world_sf <- world_sf[-no_neighbors, ]
+  rownames(world_sf) <- as.character(world_sf$admin)  #reset rownames properly!
+  world_sp <- as(world_sf, "Spatial")
+  neighbors <- poly2nb(world_sp, row.names = world_sf$admin)
+}
+
+#regenerate everything after removing regions with no neighbors (Islands)
+# world_sp <- as(world_sf, "Spatial")
+# neighbors <- poly2nb(world_sp, row.names = world_sf$admin)
 data_matched <- data_cleaned %>%
   filter(Location %in% world_sf$admin) %>%
-  left_join(world_sf %>% st_drop_geometry() %>% select(admin, region_id),
-            by = c("Location" = "admin"))
-
-stopifnot(all(!is.na(data_matched$region_id)))
-
-
+  mutate(region_idx = match(Location, world_sf$admin))
 
 
 ```
@@ -177,20 +191,14 @@ stopifnot(all(!is.na(data_matched$region_id)))
 #Make the CAR inputs for Stan
 #neighbor list to adjacency pairs(node1, node2)
 
-# Convert sf to Spatial
-world_sp <- as(world_sf, "Spatial")
-neighbors <- poly2nb(world_sp, row.names = world_sf$region_id)  # now using your custom region IDs
-
-# Build adjacency pairs
 node1 <- c()
 node2 <- c()
-for (i in seq_along(neighbors)) {
+for (i in 1:length(neighbors)) {
   for (j in neighbors[[i]]) {
-    node1 <- c(node1, world_sf$region_id[i])
-    node2 <- c(node2, world_sf$region_id[j])
+    node1 <- c(node1, i)
+    node2 <- c(node2, j)
   }
 }
-
 
 
 neighbors
@@ -225,8 +233,8 @@ stan_data <- list(
   y = data_matched$FactValueNumeric,
   time = as.integer(data_matched$Period == 2021),
   R = R,
-  region = data_matched$region_id,
-  N_edges = length(node2),
+  region = data_matched$region_idx,
+  N_edges = length(node1),
   node1 = node1,
   node2 = node2,
   num_neighbors = num_neighbors
