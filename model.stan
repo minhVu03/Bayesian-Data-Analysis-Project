@@ -28,7 +28,7 @@ data {
 // accepts two parameters 'mu' and 'sigma'.
 parameters {
   real mu; // global mean suicide rate
-  real beta; // time effect
+  real beta; // time effect //remove this
   vector[R] phi;  //spatial random effect (for CAR)
   real<lower=0> sigma_phi; //SD for spatial effect
   real<lower=0> sigma;// Observation noise

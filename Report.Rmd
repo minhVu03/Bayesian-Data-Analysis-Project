@@ -205,7 +205,7 @@ nrow(data_matched)
 stan_data <- list(
   N = nrow(data_matched),
   y = data_matched$FactValueNumeric,
-  time = as.integer(data_matched$Period == 2021),
+  time = as.integer(data_matched$Period == 2021), #remove this
   R = R,
   region = data_matched$region_id,
   N_edges = length(node1),
