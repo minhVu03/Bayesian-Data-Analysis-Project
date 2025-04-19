@@ -330,7 +330,7 @@ Why use iter = 2000 and chains = 4:
 ```{r}
 #setwd("C:/Users/Minh/OneDrive/Documents/Bayesian-Data-Analysis-Project")
 model <- stan_model(file = "model.stan")
-fit <- sampling(model, data = stan_data, iter = 2000, chains = 4, seed = 123)
+fit <- sampling(model, data = stan_data, iter = 4000, warmup = 2000, chains = 4, seed = 123)
 print(fit)
 ```
 
@@ -346,6 +346,28 @@ library(bayesplot)
 summary(fit)$summary
 
 mcmc_trace(as.array(fit), pars = c("mu", "sigma", "sigma_phi"))
+
+```
+
+```{r}
+summary(fit, pars = "mu")$summary
+
+```
+
+```{r}
+# Extract posterior samples for 'phi' (spatial random effects)
+phi_samples <- rstan::extract(fit)$phi
+
+# Calculate posterior mean of phi for each region
+phi_mean <- apply(phi_samples, 2, mean)
+
+# Add phi_mean to the world_sf dataset
+world_sf$phi_mean <- phi_mean
+
+# Visualize the posterior mean of phi on the map
+library(mapview)
+mapview(world_sf, zcol = "phi_mean", legend = TRUE)
+
 
 ```
 
@@ -387,41 +409,41 @@ TODO!! - move all code here at the end
 # **References**
 
 Brunsdon, C. (2019). *Using rstan and spdep for spatial modelling.*
-RPubs by RStudio.[
-https://rstudio-pubs-static.s3.amazonaws.com/243277_01730c1f0a984132bce5d5d25bec62aa.html](https://rstudio-pubs-static.s3.amazonaws.com/243277_01730c1f0a984132bce5d5d25bec62aa.html)
+RPubs by
+RStudio.<https://rstudio-pubs-static.s3.amazonaws.com/243277_01730c1f0a984132bce5d5d25bec62aa.html>
 
 Centers for Disease Control and Prevention. (2022, September 30).
-*Suicide increases in 2021 after two years of decline*.[
-https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2022/20220930.html](https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2022/20220930.html)
+*Suicide increases in 2021 after two years of
+decline*.<https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2022/20220930.html>
 
 Congdon, P. (1997). Bayesian models for spatial incidence: A case study
-of suicide using the BUGS program. *Health & Place,* 3(4), 229–247.[
-https://doi.org/10.1016/s1353-8292(97)00017-8](https://doi.org/10.1016/s1353-8292(97)00017-8)
+of suicide using the BUGS program. *Health & Place,* 3(4),
+229–247.[https://doi.org/10.1016/s1353-8292(97)00017-8](https://doi.org/10.1016/s1353-8292(97)00017-8)
 
 Donegan, C. (2023, October 2). *Custom spatial models with RStan and
-geostan.* The Comprehensive R Archive Network.[
-https://cran.r-project.org/web/packages/geostan/vignettes/custom-spatial-models.html](https://cran.r-project.org/web/packages/geostan/vignettes/custom-spatial-models.html)
+geostan.* The Comprehensive R Archive
+Network.<https://cran.r-project.org/web/packages/geostan/vignettes/custom-spatial-models.html>
 
 Garnett, M. F., & Curtin, S. C. (2023). Suicide mortality in the United
-States, 2001–2021. *NCHS Data Brief No. 464*.[
-https://doi.org/10.15620/cdc:125705](https://doi.org/10.15620/cdc:125705)
+States, 2001–2021. *NCHS Data Brief No.
+464*.<https://doi.org/10.15620/cdc:125705>
 
 Moraga, P. (n.d.). *Bayesian Spatial Models*. Spatial Statistics for
-Data Science: Theory and Practice with R.[
-https://www.paulamoraga.com/book-spatial/bayesian-spatial-models.html](https://www.paulamoraga.com/book-spatial/bayesian-spatial-models.html)
+Data Science: Theory and Practice with
+R.<https://www.paulamoraga.com/book-spatial/bayesian-spatial-models.html>
 
 Morris, M. (n.d.). *Spatial Models in Stan: Intrinsic Auto-Regressive
-Models for Areal Data*. Stan: Software for Bayesian Data Analysis.[
-https://mc-stan.org/users/documentation/case-studies/icar_stan.html](https://mc-stan.org/users/documentation/case-studies/icar_stan.html)
+Models for Areal Data*. Stan: Software for Bayesian Data
+Analysis.<https://mc-stan.org/users/documentation/case-studies/icar_stan.html>
 
 Pathirathna, M. L., Nandasena, H. M., Atapattu, A. M., & Weerasekara, I.
 (2022). Impact of the COVID-19 pandemic on suicidal attempts and death
-rates: A systematic review. *BMC Psychiatry,* 22*.*[
-https://doi.org/10.1186/s12888-022-04158-w](https://doi.org/10.1186/s12888-022-04158-w)
+rates: A systematic review. *BMC Psychiatry,*
+22*.*<https://doi.org/10.1186/s12888-022-04158-w>
 
 U.S. Department of Health and Human Services. (2025, March). *Suicide.*
-National Institute of Mental Health.[
-https://www.nimh.nih.gov/health/statistics/suicide](https://www.nimh.nih.gov/health/statistics/suicide)
+National Institute of Mental
+Health.<https://www.nimh.nih.gov/health/statistics/suicide>
 
-World Health Organization. (n.d.). *Suicide Rates*.[
-https://www.who.int/data/gho/data/themes/mental-health/suicide-rates](https://www.who.int/data/gho/data/themes/mental-health/suicide-rates)
+World Health Organization. (n.d.). *Suicide
+Rates*.<https://www.who.int/data/gho/data/themes/mental-health/suicide-rates>
