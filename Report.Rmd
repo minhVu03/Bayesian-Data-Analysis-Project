@@ -337,6 +337,18 @@ print(fit)
 !!! TODO- evaluation of posterior, e.g. "An appropriate combination of
 diagnostics, synthetic datasets and other validation strategies."
 
+## Model Diagnostics
+
+```{r}
+library(ggplot2)
+library(bayesplot)
+
+summary(fit)$summary
+
+mcmc_trace(as.array(fit), pars = c("mu", "sigma", "sigma_phi"))
+
+```
+
 # **Discussion**
 
 ## **Results**
