@@ -10,6 +10,7 @@ urlcolor: blue
 Members: Minh and Jana
 
 ```{r setup, include = TRUE}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, error = TRUE)
 library(tidyverse)
 theme_set(theme_bw())
@@ -36,7 +37,7 @@ library(terra)
 library(dplyr)
 library(readr)
 library(rnaturalearth)
-library(rnaturalearthdata) 
+library(rnaturalearthdata)
 
 #For fuzzy matching rnaturalearthdata country names to our dataset's country names
 install.packages("fuzzyjoin")
@@ -102,15 +103,9 @@ As we have obtained the cleaned data for suicide rates in 2019 and 2021, we can 
 ## Get adjacency pairs
 Firstly we need to know which countries are neighbours of each other
 https://cran.r-project.org/web/packages/rnaturalearth/vignettes/rnaturalearth.html
-```{r}
-# Load world country boundaries as an sf object
-# world_sf <- ne_countries(scale = "medium", returnclass = "sf")
-# world_sf <- st_make_valid(world_sf)
-# world_sp <- as(world_sf, "Spatial") #turn into spatial data
-```
 
 During the data analysis process we realized that the country names in our dataset did not match with the country names of the rnaturalearthdata dataset that we are using to model the spatial data. This led to the model mistaking the countries as having no neighbours and producing nodes with values 0.
-To solve this, we used fuzzy matching to match the unique country values in world_sf$admin with the country names in our WHO dataset. 
+To solve this, we renamed the country names in our dataset to match that of rnaturalworld's
 
 ```{r}
 # unique(data$Location)
@@ -157,7 +152,6 @@ world_sf <- ne_countries(scale = "medium", returnclass = "sf") %>%
   filter(admin %in% data_cleaned$Location) %>%
   arrange(admin)  # ensure a consistent order
 
-# Assign a clean 1-based index
 world_sf$region_id <- 1:nrow(world_sf)
 
 data_matched <- data_cleaned %>%
@@ -167,53 +161,41 @@ data_matched <- data_cleaned %>%
 
 stopifnot(all(!is.na(data_matched$region_id)))
 
-
+any(world_sf$region_id == 0)
 
 
 ```
 
 ## Convert Neighbor List to Adjacency Pairs
 ```{r}
-#Make the CAR inputs for Stan
-#neighbor list to adjacency pairs(node1, node2)
-
-# Convert sf to Spatial
 world_sp <- as(world_sf, "Spatial")
-neighbors <- poly2nb(world_sp, row.names = world_sf$region_id)  # now using your custom region IDs
 
-# Build adjacency pairs
-node1 <- c()
-node2 <- c()
-for (i in seq_along(neighbors)) {
-  for (j in neighbors[[i]]) {
-    node1 <- c(node1, world_sf$region_id[i])
-    node2 <- c(node2, world_sf$region_id[j])
-  }
-}
-
-
-
-neighbors
+#### making neighbors!!
+neighbors <- poly2nb(world_sp, row.names = world_sf$region_id)
 
 num_neighbors <- sapply(neighbors, length)
 R <- length(neighbors)
-num_neighbors
 
-print(world_sf$admin[node1[22]])
+#regions with at least one neighbor -> we want to leave out countries with no neighbors
+valid_indices <- which(num_neighbors > 0)
+
+node1 <- c()
+node2 <- c()
+
+for (i in valid_indices) { #only make nodes for countries with neighbors
+  for (j in neighbors[[i]]) {
+    if (j != 0 && world_sf$region_id[j] != 0) { #i purposely excluded zeros so node2 doesnt have 0 "indexing" from region_id in world_sf
+      node1 <- c(node1, world_sf$region_id[i])
+      node2 <- c(node2, world_sf$region_id[j])
+    }
+  }
+}
+
+stopifnot(!any(node2 == 0))
 length(node1)
-print(world_sf$admin[node2[22]])
 length(node2)
+any(node2==0) #a lot of debugging led to this being false
 
-node1[22]
-node2[22]
-
-print(world_sf$admin[node2 == 0])
-which(node2 == 0)
-
-any(node1==0)
-any(node2==0)
-#Check for any country name in data_cleaned that cant be found in world_sf
-setdiff(data_cleaned$Location, world_sf$admin)
 
 ```
 
@@ -226,11 +208,12 @@ stan_data <- list(
   time = as.integer(data_matched$Period == 2021),
   R = R,
   region = data_matched$region_id,
-  N_edges = length(node2),
+  N_edges = length(node1),
   node1 = node1,
   node2 = node2,
   num_neighbors = num_neighbors
 )
+
 ```
 
 
