@@ -5,9 +5,12 @@ output:
     number_sections: false
     toc: FALSE
 urlcolor: blue
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
-Members: Minh and Jana
+Members: Minh 33077769 Jana 87884193
 
 ```{r setup, include = TRUE}
 options(repos = c(CRAN = "https://cloud.r-project.org"))
@@ -46,32 +49,89 @@ library(fuzzyjoin)
 ```
 
 # Introduction
-In our world today, mental health has become more crucial and suicide remains a significant public health concern worldwide, with rates varying across regions due to complex social, economic, and cultural factors. Therefore, understanding the geographic distribution of suicide rates is important for the development of targeted mental health policies and preventative measures. Although where we live in the world largely affects our mental and physical lifestyles, there has not been many studies done on the geographical characteristics of suicide rates and mental well-being.
 
-In this study, we apply a Bayesian hierarchical model with a conditionally autoregressive (CAR) prior to investigate spatial patterns in suicide rates across countries, stratified by sex groups. We will be using a Poisson likelihood to obtain a prior distribution. After which, inferential analysis will be done using Monte Carlo Markov Chain (MCMC) done in Stan.
+Mental health has become an increasingly important topic and suicide
+remains a significant public health concern worldwide, with rates
+varying across regions due to complex social, economic, and cultural
+factors. Therefore, understanding the geographic distribution of suicide
+rates may be important for the development of targeted mental health
+policies and preventative measures. Although place of habitation clearly
+affect mental and physical lifestyles, there have few studies conducted
+on the geographical relationship between suicide rates and mental
+well-being.
 
-This research specifically focuses on two recent years,2019 and 2021, to investigate any observable changes in suicide patterns potentially influenced by global events like the COVID-19 pandemic. Our main research question is: Are there identifiable spatial clusters of high suicide rates, and do these rates differ between 2019 and 2021?
+In this study, we apply a Bayesian hierarchical model with a
+conditionally autoregressive (CAR) prior to investigate spatial patterns
+in suicide rates across countries, **!!TODO: THIS PART IS WRONG NOW:
+stratified by sex groups. We will be using a Poisson likelihood to
+obtain a prior distribution.** After which, inferential analysis will be
+done using Monte Carlo Markov Chain (MCMC) done in Stan.
 
-This approach allows us to identify high-risk regions, quantify uncertainty, and better understand how neighboring countries may influence each other’s suicide rates, providing valuable insights for data-informed mental health interventions.
+**!! TODO: THIS PART IS WRONG NOW: This research specifically focuses on
+two recent years, 2019 and 2021,** to investigate any observable changes
+in suicide patterns potentially influenced by global events like the
+COVID-19 pandemic. **!! TODO: THIS PART NEEDS TO CHANGE: Our main
+research question is: Are there identifiable spatial clusters of high
+suicide rates, and do these rates differ between 2019 and 2021?**
 
+This approach allows us to identify high-risk regions, quantify
+uncertainty, and better understand how neighboring countries may
+influence each other’s suicide rates. Valuable insights from this
+analysis may provide the opportunity to create more data-informed mental
+health interventions.
+
+**!! TODO: add link to github repo**
 
 # Literature Review
+
 ## TO DO
 
+A similar study on the relationship between location and suicide has
+been conducted, but the data was limited to regions in London and with
+the rise of social media and the global pandemic, the information may
+now be outdated (Congdon, P., 1997). In comparison, our dataset contains
+over 180 countries and the analysis focuses on 2021, which may show the
+impact of the COVID-19 pandemic on suicide rates.
+
+"The social restriction practices and policies imposed by different
+countries secondary to the COVID-19 pandemic might have negatively
+influenced the fore-said risk factors that has been indirectly led
+increased rates of suicidal attempts and deaths" (Pathirathna et al.,
+2022).
+
 # Dataset and Data Cleaning
+
 Dataset Name: Crude Suicide Rate (Per 100,000 Population)
-Source: https://www.who.int/data/gho/data/themes/mental-health/suicide-rates
-Description: The raw dataset has notable features like country, age group, sex, and suicide rate (per 100,000 people) that can be extracted.
+
+Source:
+<https://www.who.int/data/gho/data/themes/mental-health/suicide-rates>
+
+Description: The raw dataset has notable features like country, age
+group, sex, and suicide rate (per 100,000 people) that can be extracted.
 
 Location: Country name
+
 Period: Year (2019, 2021)
+
 Dim1: Sex ("Female", "Both sexes", "Male)
-FactValueNumeric: Number of suicide deaths in a year, divided by the population and multiplied by 100 000 (as indicated in the original data source)
+
+FactValueNumeric: Number of suicide deaths in a year, divided by the
+population and multiplied by 100 000 (as indicated in the original data
+source)
+
 FactValueNumericLow: Low estimate
+
 FactValueNumericHigh: High estimate
 
-Note: The FactValueNumeric data are estimates of the number of suicides. "The estimates are derived from the WHO Global Health Estimates (GHE)" [data source]. However, some countries may not have an accurate way of recording the exact number of deaths, potentially leading to inaccurate estimations. Hence there is a high and low in the death rates.
-"For countries without high-quality death registration data, cause of death estimates are calculated using other data, including household surveys with verbal autopsy, sample or sentinel registration systems, special studies" [data source].
+Note: The FactValueNumeric data are estimates of the number of suicides.
+"The estimates are derived from the WHO Global Health Estimates (GHE)"
+[data source]. However, some countries may not have an accurate way of
+recording the exact number of deaths, potentially leading to inaccurate
+estimations. Hence there is a high and low in the death rates. "For
+countries without high-quality death registration data, cause of death
+estimates are calculated using other data, including household surveys
+with verbal autopsy, sample or sentinel registration systems, special
+studies" [data source].
 
 ```{r}
 data_raw = read.csv("suicide_rate_raw.csv", header = TRUE)
@@ -85,27 +145,70 @@ min(data$FactValueNumeric)
 nrow(data)
 
 ```
+
 The dataset after filtering consists of 740 observations.
 
 <!-- filter data to only include 2019 and 2021 -->
+
 <!-- ```{r} -->
+
 <!-- suicide_2019 <- filter(data, Period == 2019) -->
+
 <!-- suicide_2021 <- filter(data, Period == 2021) -->
+
 <!-- ``` -->
 
-
 # Data Analysis
-As we have obtained the cleaned data for suicide rates in 2019 and 2021, we can now declare a prior model from information obtained historically.
 
-## Explanation of priors
-... Numbers in the parameters list in stan code
+As we have obtained the cleaned data for suicide rates in 2019 and 2021,
+we can now declare a prior model from information obtained historically.
+
+## **Model**
+
+Priors:
+
+$\mu \sim \mathcal{N}(9.2, 3)$
+
+$\beta \sim \mathcal{N}(0, 1)$
+
+$\sigma_\phi \sim \text{Exp}(1)$
+
+$\sigma \sim \text{Exp}(1)$
+
+$\phi_{\text{node1}[i]} - \phi_{\text{node2}[i]} \sim \mathcal{N}\left(0, \sigma_\phi^2\right) \quad \text{for } i = 1, \ldots, N_{\text{edges}}$
+
+$\sum_{r=1}^R \phi_r^2 \sim \mathcal{N}\left(0, R \cdot \sigma_\phi^2\right)$
+
+Likelihood:
+
+$y_n \sim \mathcal{N}(\mu + \beta \cdot t_n + \phi_{r_n}, \sigma) \quad \text{for } n = 1, \ldots, N$
+
+In 2020, the global average suicide rate was 9.2 people per 100,000
+people (World Health Organization, n.d.). Therefore, we've chosen this
+as the mean for our prior on the estimate of the global suicide rate
+$\mu$. Additionally, a standard deviation of 3 allows for reasonable
+uncertainty around the average without being overly tight.
+
+The $\beta$ parameter represents the effect of time, for which we've
+chosen a weakly information parameter. **NOTE/QUESTION/TODO: the initial
+prior we picked was normal(0.1, 0.05) based on research so we did we
+change this to (0,1)?**
+
+The prior on both the standard deviation of spatial effects
+$\sigma_\phi$ and the observation noise $\sigma$ is $Exp(1)$, which
+allows for smaller, more reasonable standard deviations.
 
 ## Get adjacency pairs
-Firstly we need to know which countries are neighbours of each other
-https://cran.r-project.org/web/packages/rnaturalearth/vignettes/rnaturalearth.html
 
-During the data analysis process we realized that the country names in our dataset did not match with the country names of the rnaturalearthdata dataset that we are using to model the spatial data. This led to the model mistaking the countries as having no neighbours and producing nodes with values 0.
-To solve this, we renamed the country names in our dataset to match that of rnaturalworld's
+Firstly we need to know which countries are neighbors of each other
+<https://cran.r-project.org/web/packages/rnaturalearth/vignettes/rnaturalearth.html>
+
+During the data analysis process we realized that the country names in
+our dataset did not match with the country names of the
+rnaturalearthdata dataset that we are using to model the spatial data.
+This led to the model mistaking the countries as having no neighbors and
+producing nodes with values 0. To solve this, we renamed the country
+names in our dataset to match that of rnaturalworld's
 
 ```{r}
 # unique(data$Location)
@@ -144,7 +247,9 @@ data_cleaned <- data %>%
 
 ```
 
-Now we can join the two datasets so our original dataset will have adjacency parameters from world_sf
+Now we can join the two datasets so our original dataset will have
+adjacency parameters from world_sf
+
 ```{r}
 #From rnaturalearth dataset
 world_sf <- ne_countries(scale = "medium", returnclass = "sf") %>%
@@ -167,6 +272,7 @@ any(world_sf$region_id == 0)
 ```
 
 ## Convert Neighbor List to Adjacency Pairs
+
 ```{r}
 world_sp <- as(world_sf, "Spatial")
 
@@ -200,6 +306,7 @@ any(node2==0) #a lot of debugging led to this being false
 ```
 
 ## STAN Data List
+
 ```{r}
 nrow(data_matched)
 stan_data <- list(
@@ -216,10 +323,10 @@ stan_data <- list(
 
 ```
 
-
-Extract posterior data from STAN code file
-Code reference: https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html
+Extract posterior data from STAN code file Code reference:
+<https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html>
 Why use iter = 2000 and chains = 4:
+
 ```{r}
 #setwd("C:/Users/Minh/OneDrive/Documents/Bayesian-Data-Analysis-Project")
 model <- stan_model(file = "model.stan")
@@ -227,6 +334,82 @@ fit <- sampling(model, data = stan_data, iter = 2000, chains = 4, seed = 123)
 print(fit)
 ```
 
+!!! TODO- evaluation of posterior, e.g. "An appropriate combination of
+diagnostics, synthetic datasets and other validation strategies."
 
+# **Discussion**
 
+## **Results**
 
+TODO!!
+
+## **Limitations**
+
+The spatial prior assumes that nearby countries have similar suicide
+rates, so if there are sharp differences between neighboring regions,
+the model may over-smooth and underrepresent the true variation.
+
+Additionally, the focus of this analysis is whether or not there is a
+spatial relationship between location and suicide rate, but it does not
+consider underlying factors, such as culture, mental health resources,
+and economic state. For example, the topic of mental health is
+considered to be taboo in many countries, resulting in limited access to
+mental health resources.
+
+The next step would be to look further into these underlying factors and
+determine whether or not there is a relationship between the factor and
+suicide rate (e.g. is there a relationship between suicide rate and
+lower income households in the United States and Canada?). This can be
+combined with information about distribution of suicide rates across sex
+and age to give more insight into which subset of groups should be
+targeted for suicide prevention methods in certain countries.
+
+# **Member Contributions**
+
+!!!TODO - small paragraph discussing what each member did
+
+# **Appendix**
+
+TODO!! - move all code here at the end
+
+# **References**
+
+Brunsdon, C. (2019). *Using rstan and spdep for spatial modelling.*
+RPubs by RStudio.[
+https://rstudio-pubs-static.s3.amazonaws.com/243277_01730c1f0a984132bce5d5d25bec62aa.html](https://rstudio-pubs-static.s3.amazonaws.com/243277_01730c1f0a984132bce5d5d25bec62aa.html)
+
+Centers for Disease Control and Prevention. (2022, September 30).
+*Suicide increases in 2021 after two years of decline*.[
+https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2022/20220930.html](https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2022/20220930.html)
+
+Congdon, P. (1997). Bayesian models for spatial incidence: A case study
+of suicide using the BUGS program. *Health & Place,* 3(4), 229–247.[
+https://doi.org/10.1016/s1353-8292(97)00017-8](https://doi.org/10.1016/s1353-8292(97)00017-8)
+
+Donegan, C. (2023, October 2). *Custom spatial models with RStan and
+geostan.* The Comprehensive R Archive Network.[
+https://cran.r-project.org/web/packages/geostan/vignettes/custom-spatial-models.html](https://cran.r-project.org/web/packages/geostan/vignettes/custom-spatial-models.html)
+
+Garnett, M. F., & Curtin, S. C. (2023). Suicide mortality in the United
+States, 2001–2021. *NCHS Data Brief No. 464*.[
+https://doi.org/10.15620/cdc:125705](https://doi.org/10.15620/cdc:125705)
+
+Moraga, P. (n.d.). *Bayesian Spatial Models*. Spatial Statistics for
+Data Science: Theory and Practice with R.[
+https://www.paulamoraga.com/book-spatial/bayesian-spatial-models.html](https://www.paulamoraga.com/book-spatial/bayesian-spatial-models.html)
+
+Morris, M. (n.d.). *Spatial Models in Stan: Intrinsic Auto-Regressive
+Models for Areal Data*. Stan: Software for Bayesian Data Analysis.[
+https://mc-stan.org/users/documentation/case-studies/icar_stan.html](https://mc-stan.org/users/documentation/case-studies/icar_stan.html)
+
+Pathirathna, M. L., Nandasena, H. M., Atapattu, A. M., & Weerasekara, I.
+(2022). Impact of the COVID-19 pandemic on suicidal attempts and death
+rates: A systematic review. *BMC Psychiatry,* 22*.*[
+https://doi.org/10.1186/s12888-022-04158-w](https://doi.org/10.1186/s12888-022-04158-w)
+
+U.S. Department of Health and Human Services. (2025, March). *Suicide.*
+National Institute of Mental Health.[
+https://www.nimh.nih.gov/health/statistics/suicide](https://www.nimh.nih.gov/health/statistics/suicide)
+
+World Health Organization. (n.d.). *Suicide Rates*.[
+https://www.who.int/data/gho/data/themes/mental-health/suicide-rates](https://www.who.int/data/gho/data/themes/mental-health/suicide-rates)
