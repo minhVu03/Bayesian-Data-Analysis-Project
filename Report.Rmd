@@ -1,9 +1,9 @@
 ---
-title: "Bayesian Data Analysis Project"
+title: "Bayesian Spatial Analysis on Global Suicide Rates"
 output: 
   bookdown::pdf_document2:
     number_sections: false
-    toc: FALSE
+    toc: false
 urlcolor: blue
 editor_options: 
   markdown: 
@@ -62,17 +62,18 @@ well-being.
 
 In this study, we apply a Bayesian hierarchical model with a
 conditionally autoregressive (CAR) prior to investigate spatial patterns
-in suicide rates across countries, **!!TODO: THIS PART IS WRONG NOW:
-stratified by sex groups. We will be using a Poisson likelihood to
-obtain a prior distribution.** After which, inferential analysis will be
-done using Monte Carlo Markov Chain (MCMC) done in Stan.
+in suicide rates across countries. We model the suicide rate as a
+continuous outcome using a Gaussian likelihood, with a global intercept,
+a temporal effect comparing 2019 and 2021, and spatial random effects
+that capture regional deviationas.
 
-**!! TODO: THIS PART IS WRONG NOW: This research specifically focuses on
-two recent years, 2019 and 2021,** to investigate any observable changes
-in suicide patterns potentially influenced by global events like the
-COVID-19 pandemic. **!! TODO: THIS PART NEEDS TO CHANGE: Our main
-research question is: Are there identifiable spatial clusters of high
-suicide rates, and do these rates differ between 2019 and 2021?**
+Our analysis focuses specifically on the years2019 and 2021, to
+investigate any observable changes in suicide patterns potentially
+influenced by global events like the COVID-19 pandemic. Inference is
+performed using MCMC sampling in Stan. Our main research question is:
+Are there identifiable spatial patterns that persist after taking global
+and temporal effects into account, and did suicide rates change
+significantly between 2019 and 2021 at a global level?
 
 This approach allows us to identify high-risk regions, quantify
 uncertainty, and better understand how neighboring countries may
@@ -80,7 +81,8 @@ influence each other’s suicide rates. Valuable insights from this
 analysis may provide the opportunity to create more data-informed mental
 health interventions.
 
-**!! TODO: add link to github repo**
+The GitHub repository can be found at the following link:
+<https://github.com/minhVu03/Bayesian-Data-Analysis-Project>
 
 # Literature Review
 
@@ -196,9 +198,10 @@ change this to (0,1)?**
 
 The prior on both the standard deviation of spatial effects
 $\sigma_\phi$ and the observation noise $\sigma$ is $Exp(1)$, which
-allows for smaller, more reasonable standard deviations.
+allows for smaller, more reasonable standard deviations. We've chosen to
+use weakly informative parameters here.
 
-## Get adjacency pairs
+## Get Adjacency Pairs
 
 Firstly we need to know which countries are neighbors of each other
 <https://cran.r-project.org/web/packages/rnaturalearth/vignettes/rnaturalearth.html>
@@ -327,8 +330,9 @@ Extract posterior data from STAN code file Code reference:
 <https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html>
 Why use iter = 2000 and chains = 4:
 
-```{r}
+```{r, message = FALSE, results = 'hide'}
 #setwd("C:/Users/Minh/OneDrive/Documents/Bayesian-Data-Analysis-Project")
+verbose=FALSE
 model <- stan_model(file = "model.stan")
 fit <- sampling(model, data = stan_data, iter = 4000, warmup = 2000, chains = 4, seed = 123)
 print(fit)
@@ -343,7 +347,7 @@ diagnostics, synthetic datasets and other validation strategies."
 library(ggplot2)
 library(bayesplot)
 
-summary(fit)$summary
+head(summary(fit)$summary)
 
 mcmc_trace(as.array(fit), pars = c("mu", "sigma", "sigma_phi"))
 
@@ -354,7 +358,12 @@ summary(fit, pars = "mu")$summary
 
 ```
 
+## Posterior Visualization
+
 ```{r}
+install.packages("webshot")
+webshot::install_phantomjs()
+
 # Extract posterior samples for 'phi' (spatial random effects)
 phi_samples <- rstan::extract(fit)$phi
 
@@ -366,8 +375,13 @@ world_sf$phi_mean <- phi_mean
 
 # Visualize the posterior mean of phi on the map
 library(mapview)
-mapview(world_sf, zcol = "phi_mean", legend = TRUE)
+library(webshot)
+library(htmlwidgets)
 
+m <- mapview(world_sf, zcol = "phi_mean")
+mapshot(m, file = "phi_map.png")
+
+#knitr::include_graphics("phi_map.png")  # include in PDF output, comment this out to see interactive map
 
 ```
 
