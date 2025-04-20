@@ -9,7 +9,6 @@
 //    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
 //
 
-// The input data is a vector 'y' of length 'N'.
 data {
   int<lower=1> N;   // #of observations
   vector[N] y;//suicide rate (continuous)
@@ -24,21 +23,16 @@ data {
   int<lower=0> num_neighbors[R];// Number of neighbors per region
 }
 
-// The parameters accepted by the model. Our model
-// accepts two parameters 'mu' and 'sigma'.
 parameters {
   real mu; // global mean suicide rate
-  real beta; // time effect //remove this
+  real beta; // time effect
   vector[R] phi;  //spatial random effect (for CAR)
   real<lower=0> sigma_phi; //SD for spatial effect
   real<lower=0> sigma;// Observation noise
 }
 
-// The model to be estimated. We model the output
-// 'y' to be normally distributed with mean 'mu'
-// and standard deviation 'sigma'.
 model {
-  // Priors
+  // priors
   mu ~ normal(9.2, 3); //lit reviewed global average
   beta ~ normal(0.1, 0.05);  //time effect prior
   sigma_phi ~ exponential(1);
@@ -51,7 +45,7 @@ model {
   //soft sum-to-zero constraint for identifiability
   target += -0.5 * dot_self(phi) / (R * sigma_phi^2);
 
-  //Likelihood
+  //likelihood
   for (n in 1:N) {
     y[n] ~ normal(mu + beta * time[n] + phi[region[n]], sigma);
   }

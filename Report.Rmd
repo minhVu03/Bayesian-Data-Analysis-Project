@@ -141,6 +141,11 @@ estimates are calculated using other data, including household surveys
 with verbal autopsy, sample or sentinel registration systems, special
 studies" (World Health Organization, n.d.).
 
+We filter out observations where sex is “Both Sexes” to remove
+duplicates, as this level accounts for observations that are already
+labeled either as “Female” or “Male.” See (A2) for the R code. The first
+six rows of the dataset are shown below:
+
 ```{r}
 data_raw = read.csv("suicide_rate_raw.csv", header = TRUE)
 
@@ -170,7 +175,8 @@ The dataset after filtering consists of 740 observations.
 # Data Analysis
 
 As we have obtained the cleaned data for suicide rates in 2019 and 2021,
-we can now declare a prior model from information obtained historically.
+we can now declare a prior model from information obtained from previous
+studies.
 
 ## **Model**
 
@@ -211,15 +217,15 @@ use weakly informative parameters here.
 
 ## Get Adjacency Pairs
 
-Firstly we need to know which countries are neighbors of each other
-<https://cran.r-project.org/web/packages/rnaturalearth/vignettes/rnaturalearth.html>
-
-During the data analysis process we realized that the country names in
-our dataset did not match with the country names of the
-rnaturalearthdata dataset that we are using to model the spatial data.
-This led to the model mistaking the countries as having no neighbors and
-producing nodes with values 0. To solve this, we renamed the country
-names in our dataset to match that of rnaturalworld's.
+Our dataset does not include information on the neighbors of each
+country, so we’ve used an additional dataset rnaturalearthdata to inform
+the conditional autoregressive aspect of the model. We renamed the
+country names in our dataset to match that of rnaturalearthdata’s. See
+(A3) for the R code. Then, we can join the two datasets so our original
+dataset will have adjacency parameters from the world_sf dataset. We
+also convert the country-level spatial polygons into adjacency pairs to
+represent neighboring countries, which we will use to build the CAR
+prior structure in our model.
 
 ```{r}
 data_cleaned <- data %>%
@@ -307,6 +313,14 @@ any(node2==0)
 
 ## STAN Data List
 
+Now we can build our list of data inputs formatted for our Stan model.
+See (A11) for the Stan file and A(6) for the R code.
+
+Note: We’ve chosen to use iter=4000 and warmup=2000 to improve MCMC
+mixing. Initially, we attempted using iter=2000 and found that the
+chains did not mix well for mu, and increasing the number of iterations
+provided a slight improvement.
+
 ```{r}
 nrow(data_matched)
 stan_data <- list(
@@ -323,7 +337,7 @@ stan_data <- list(
 
 ```
 
-Extract posterior data from STAN code file Code reference:
+Now, we can estimate the posterior. Code reference:
 <https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html>
 Why use iter = 2000 and chains = 4:
 
@@ -333,57 +347,114 @@ fit <- sampling(model, data = stan_data, iter = 4000, warmup = 2000, chains = 4,
 print(fit)
 ```
 
-!!! TODO- evaluation of posterior, e.g. "An appropriate combination of
-diagnostics, synthetic datasets and other validation strategies."
+We see that the temporal effect beta has a mean of 0.10, which suggests
+a slight increase in suicide rates in 2021 compared to 2019. However,
+zero is barely included in the 95% credible interval, which suggests
+that there is weak evidence of a time effect. Therefore, we conclude
+that there may be a small increased in suicide rates from 2019 to 2021,
+but the evidence is weak.
 
-## Model Diagnostics
+The phi[r] values represent the country-level deviations from the global
+suicide rate after adjusting for time. These come from a CAR prior, so
+they reflect spatial smoothing. We see that many of the values are
+non-zero (e.g. phi[5] = -8.50, indicating that this country has a
+suicide rate that is much lower than expected). This supports our
+assumption that spatial effects are strong and certain regions differ
+notably from the global mean, even after controlling for year.
+Additionally, some of the 95% credible intervals exclude 0, which
+provides strong evidence of spatial variation. See A(8) for a longer
+output of the estimates.
+
+Our current model also requires that we estimate a parameter for every
+country, which has led to a very complex model. In further studies, it
+would be helpful to use Rao Blackwellization or similar methods to
+reduce the complexity of the model.
+
+# Model Diagnostics
+
+Now we can assess how well MCMC is mixing by using trace plots.
 
 ```{r, fig.height=3}
 head(summary(fit)$summary)
-
 mcmc_trace(as.array(fit), pars = c("mu", "sigma", "sigma_phi"))
 
 ```
 
-```{r}
-summary(fit, pars = "mu")$summary
-
-```
+We observe that the trace plots for sigma and sigma_phi seem to be
+mixing well and converging. This indicates that is reliably estimated
+and the CAR prior is sampling effectively. However, we note that the
+trace plot for shows that the chains do not overlap well and may not
+converge. We’ve run the program multiple times to rule out “bad luck” as
+the cause and increased the number of iterations from 2000 to 4000,
+which helped minimally. The next steps would be to try a different
+proposal distribution, a different MCMC algorithm, or simplify the
+model.
 
 ## Posterior Visualization
 
+Now we can use the mapview library to visualize the posterior mean of
+the spatial effects on a map.
+
 ```{r}
-# Extract posterior samples for phi
+# posterior samples for phi
 phi_samples <- rstan::extract(fit)$phi
 
-# Calculate posterior mean of phi for each region
+# posterior mean of phi for each region
 phi_mean <- apply(phi_samples, 2, mean)
 
-# Add phi_mean to the world_sf dataset
 world_sf$phi_mean <- phi_mean
 
-# Visualize the posterior mean of phi on the map
-#m <- mapview(world_sf, zcol = "phi_mean")
-#m
+m <- mapview(world_sf, zcol = "phi_mean")
+m
 
 # uncomment the following lines to convert to png
 #mapshot(m, file = "phi_map.png")
 #knitr::include_graphics("phi_map.png")
-
 ```
+
+This visualization tells us how much each country deviates from the
+global average suicide rate, after adjusting for time. Countries that
+are darker in color indicate a lower-than-expected suicide rate, while
+countries that are lighter in color indicate a higher-than-expected
+suicide rate. 
+
+\
+We see that cluster of high and low phi_mean are clearly visible (e.g.
+Eastern Europe countries are lighter in color and Sub-Saharan Africa
+countries are darker in color). Since the colorings are not random, they
+form geographically contiguous regions and strongly suggest spatial
+structure.
 
 # **Discussion**
 
 ## **Results**
 
-TODO!!
+This analysis provides strong evidence that there is a spatial pattern
+in suicide rates. Our model identified strong regional deviations in
+suicide rates, even after adjusting for time, and many countries shower
+posterior mean spatial effects that were significantly above or below
+the global average. Since these deviations form geographic clusters
+rather than being randomly distributed, the analysis suggests that
+suicide rates are spatially dependent.
+
+The time effect parameter had a posterior mean of 0.1 and a 95% credible
+interval that barely excluded zero. This suggests that there may be a
+slight increase in suicide rates from 2019 to 2021, which could be
+linked to the COVID-19 pandemic. However, the magnitude is small and not
+strongly supported by the posterior.
+
+Based on these results, it may be beneficial to focus on employing more
+mental health resources in countries like Russia and South Africa, where
+the suicide rates are higher than expected. Looking further into
+countries with suicide rates that are lower than expected may also be
+helpful, as they may offer protective factors worth studying (e.g.
+cultural or social influences).
 
 ## **Limitations**
 
 The spatial prior assumes that nearby countries have similar suicide
 rates, so if there are sharp differences between neighboring regions,
 the model may over-smooth and underrepresent the true variation.
-
 Additionally, the focus of this analysis is whether or not there is a
 spatial relationship between location and suicide rate, but it does not
 consider underlying factors, such as culture, mental health resources,
@@ -391,21 +462,27 @@ and economic state. For example, the topic of mental health is
 considered to be taboo in many countries, resulting in limited access to
 mental health resources.
 
-The next step would be to look further into these underlying factors and
-determine whether or not there is a relationship between the factor and
-suicide rate (e.g. is there a relationship between suicide rate and
-lower income households in the United States and Canada?). This can be
-combined with information about distribution of suicide rates across sex
-and age to give more insight into which subset of groups should be
-targeted for suicide prevention methods in certain countries.
+A next step would be to incorporate Rao Blackwellization or another form
+of model reduction to reduce the number of parameters and provide easier
+interpretability. It may also be helpful to look further into these
+underlying factors and determine whether or not there is a relationship
+between the factor and suicide rate (e.g. is there a relationship
+between suicide rate and lower income households in the United States
+and Canada?). This can be combined with information about distribution
+of suicide rates across sex and age to give more insight into which
+subset of groups should be targeted for suicide prevention methods in
+certain countries.
 
 # **Member Contributions**
 
-!!!TODO - small paragraph discussing what each member did
+Minh worked on the introduction, finding the dataset, model formulation,
+and data analysis. Jana worked on the literature review, model
+formulation, model diagnostics and posterior visualization, and
+discussion.
 
 # **Appendix**
 
-TODO!! - move all code here at the end
+Move all code here at the end
 
 # **References**
 
