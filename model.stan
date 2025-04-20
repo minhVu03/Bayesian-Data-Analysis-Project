@@ -40,7 +40,7 @@ parameters {
 model {
   // Priors
   mu ~ normal(9.2, 3); //lit reviewed global average
-  beta ~ normal(0, 1);  //time effect prior
+  beta ~ normal(0.1, 0.05);  //time effect prior
   sigma_phi ~ exponential(1);
   sigma ~ exponential(1);
 

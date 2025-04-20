@@ -19,12 +19,10 @@ library(tidyverse)
 theme_set(theme_bw())
 require(extraDistr) #need for rdunif
 library(dplyr)
+install.packages("webshot")
+webshot::install_phantomjs()
 suppressPackageStartupMessages(require(rstan))
 
-#libraries for spatial data objects
-#install these packages if they're not already installed :)
-# install.packages(c("sf", "spdep", "rgdal")) #sf for vector datam-> shapefile
-# install.packages("terra")   # for raster data
 required_packages <- c("sf", "spdep", "terra", "dplyr", "readr", "rnaturalearth", "rnaturalearthdata")
 installed_packages <- rownames(installed.packages())
 
@@ -41,11 +39,14 @@ library(dplyr)
 library(readr)
 library(rnaturalearth)
 library(rnaturalearthdata)
+library(ggplot2)
+library(bayesplot)
+library(mapview)
+library(webshot)
+library(htmlwidgets)
 
-#For fuzzy matching rnaturalearthdata country names to our dataset's country names
 install.packages("fuzzyjoin")
 library(fuzzyjoin)
-
 ```
 
 # Introduction
@@ -142,15 +143,16 @@ studies" (World Health Organization, n.d.).
 
 ```{r}
 data_raw = read.csv("suicide_rate_raw.csv", header = TRUE)
+
 #filter out "both sexes" to avoid duplication
 data = as.data.frame(data_raw |> select(Location, Period, Dim1, FactValueNumeric, FactValueNumericLow, FactValueNumericHigh) |> filter(Dim1 %in% c("Female", "Male")) |> filter(Period %in% c(2019,2021)))
 unique(data$Period)
-# unique(data$Location)
+
 max(data$FactValueNumeric)
 min(data$FactValueNumeric)
 
 nrow(data)
-
+head(data)
 ```
 
 The dataset after filtering consists of 740 observations.
@@ -176,7 +178,7 @@ Priors:
 
 $\mu \sim \mathcal{N}(9.2, 3)$
 
-$\beta \sim \mathcal{N}(0, 1)$
+$\beta \sim \mathcal{N}(0.1, 0.05)$
 
 $\sigma_\phi \sim \text{Exp}(1)$
 
@@ -196,10 +198,11 @@ as the mean for our prior on the estimate of the global suicide rate
 $\mu$. Additionally, a standard deviation of 3 allows for reasonable
 uncertainty around the average without being overly tight.
 
-The $\beta$ parameter represents the effect of time, for which we've
-chosen a weakly information parameter. **NOTE/QUESTION/TODO: the initial
-prior we picked was normal(0.1, 0.05) based on research so we did we
-change this to (0,1)?**
+The $\beta$ parameter represents the effect of time. In the US, the
+suicide rate in 2019 was 13.9 people per 100,000, then decreased to
+13.5 people per 100,000 in 2020. It increased to 14 people per 100,000
+in 2021, so we've used the overall change in suicide rate, 0.1, from
+2019 to 2021 as the mean parameter.
 
 The prior on both the standard deviation of spatial effects
 $\sigma_\phi$ and the observation noise $\sigma$ is $Exp(1)$, which
@@ -216,12 +219,9 @@ our dataset did not match with the country names of the
 rnaturalearthdata dataset that we are using to model the spatial data.
 This led to the model mistaking the countries as having no neighbors and
 producing nodes with values 0. To solve this, we renamed the country
-names in our dataset to match that of rnaturalworld's
+names in our dataset to match that of rnaturalworld's.
 
 ```{r}
-# unique(data$Location)
-# unique(world_sf$admin)
-
 data_cleaned <- data %>%
   mutate(Location = case_when(
     Location == "Viet Nam" ~ "Vietnam",
@@ -249,17 +249,13 @@ data_cleaned <- data %>%
     Location == "Serbia" ~ "Republic of Serbia",
     TRUE ~ Location  # keep all other names unchanged
   ))
-#Search for country names in both datasets for debugging and filtering names
-#subset(data_cleaned, grepl("Singapore", Location, ignore.case = TRUE))
-# unique(subset(world_sf, grepl("Singapore", admin, ignore.case = TRUE)))
-
 ```
 
 Now we can join the two datasets so our original dataset will have
 adjacency parameters from world_sf
 
 ```{r}
-#From rnaturalearth dataset
+# From rnaturalearth dataset
 world_sf <- ne_countries(scale = "medium", returnclass = "sf") %>%
   st_make_valid() %>%
   filter(admin %in% data_cleaned$Location) %>%
@@ -275,8 +271,6 @@ data_matched <- data_cleaned %>%
 stopifnot(all(!is.na(data_matched$region_id)))
 
 any(world_sf$region_id == 0)
-
-
 ```
 
 ## Convert Neighbor List to Adjacency Pairs
@@ -284,7 +278,6 @@ any(world_sf$region_id == 0)
 ```{r}
 world_sp <- as(world_sf, "Spatial")
 
-#### making neighbors!!
 neighbors <- poly2nb(world_sp, row.names = world_sf$region_id)
 
 num_neighbors <- sapply(neighbors, length)
@@ -298,7 +291,8 @@ node2 <- c()
 
 for (i in valid_indices) { #only make nodes for countries with neighbors
   for (j in neighbors[[i]]) {
-    if (j != 0 && world_sf$region_id[j] != 0) { #i purposely excluded zeros so node2 doesnt have 0 "indexing" from region_id in world_sf
+    if (j != 0 && world_sf$region_id[j] != 0) { #purposefully excluded zeros so node2 doesnt 
+                                               # have 0 "indexing" from region_id in world_sf
       node1 <- c(node1, world_sf$region_id[i])
       node2 <- c(node2, world_sf$region_id[j])
     }
@@ -308,9 +302,7 @@ for (i in valid_indices) { #only make nodes for countries with neighbors
 stopifnot(!any(node2 == 0))
 length(node1)
 length(node2)
-any(node2==0) #a lot of debugging led to this being false
-
-
+any(node2==0)
 ```
 
 ## STAN Data List
@@ -320,7 +312,7 @@ nrow(data_matched)
 stan_data <- list(
   N = nrow(data_matched),
   y = data_matched$FactValueNumeric,
-  time = as.integer(data_matched$Period == 2021), #remove this
+  time = as.integer(data_matched$Period == 2021),
   R = R,
   region = data_matched$region_id,
   N_edges = length(node1),
@@ -335,9 +327,7 @@ Extract posterior data from STAN code file Code reference:
 <https://ubc-stat-ml.github.io/web447/w08_mcmc1/topic06_hands_on.html>
 Why use iter = 2000 and chains = 4:
 
-```{r, message = FALSE, results = 'hide'}
-#setwd("C:/Users/Minh/OneDrive/Documents/Bayesian-Data-Analysis-Project")
-verbose=FALSE
+```{r}
 model <- stan_model(file = "model.stan")
 fit <- sampling(model, data = stan_data, iter = 4000, warmup = 2000, chains = 4, seed = 123)
 print(fit)
@@ -348,10 +338,7 @@ diagnostics, synthetic datasets and other validation strategies."
 
 ## Model Diagnostics
 
-```{r}
-library(ggplot2)
-library(bayesplot)
-
+```{r, fig.height=3}
 head(summary(fit)$summary)
 
 mcmc_trace(as.array(fit), pars = c("mu", "sigma", "sigma_phi"))
@@ -366,10 +353,7 @@ summary(fit, pars = "mu")$summary
 ## Posterior Visualization
 
 ```{r}
-install.packages("webshot")
-webshot::install_phantomjs()
-
-# Extract posterior samples for 'phi' (spatial random effects)
+# Extract posterior samples for phi
 phi_samples <- rstan::extract(fit)$phi
 
 # Calculate posterior mean of phi for each region
@@ -379,14 +363,12 @@ phi_mean <- apply(phi_samples, 2, mean)
 world_sf$phi_mean <- phi_mean
 
 # Visualize the posterior mean of phi on the map
-library(mapview)
-library(webshot)
-library(htmlwidgets)
+#m <- mapview(world_sf, zcol = "phi_mean")
+#m
 
-m <- mapview(world_sf, zcol = "phi_mean")
-mapshot(m, file = "phi_map.png")
-
-#knitr::include_graphics("phi_map.png")  # include in PDF output, comment this out to see interactive map
+# uncomment the following lines to convert to png
+#mapshot(m, file = "phi_map.png")
+#knitr::include_graphics("phi_map.png")
 
 ```
 
