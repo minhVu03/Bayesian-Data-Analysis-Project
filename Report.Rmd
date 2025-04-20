@@ -76,30 +76,35 @@ and temporal effects into account, and did suicide rates change
 significantly between 2019 and 2021 at a global level?
 
 This approach allows us to identify high-risk regions, quantify
-uncertainty, and better understand how neighboring countries may
-influence each other’s suicide rates. Valuable insights from this
-analysis may provide the opportunity to create more data-informed mental
-health interventions.
+uncertainty, and better understand how suicide rates are spatially
+structure, with similarities among neighboring countries. Valuable
+insights from this analysis may provide the opportunity to create more
+data-informed mental health interventions.
 
 The GitHub repository can be found at the following link:
 <https://github.com/minhVu03/Bayesian-Data-Analysis-Project>
 
 # Literature Review
 
-## TO DO
+In a recent press release, the CDC stated that suicide rates in the US
+decreased from 2019 to 2020, but then increased from 2020 to 2021
+(Centers for Disease Control and Prevention, 2022). Additionally,
+another paper stated that factors such as domestic violence, financial
+strain, and mental health conditions were prominent issues during the
+pandemic, and "the social restriction practices and policies imposed by
+different countries secondary to the COVID-19 pandemic might have
+negatively influenced the fore-said risk factors that has been
+indirectly led increased rates of suicidal attempts and deaths"
+(Pathirathna et al., 2022). This information leads us to believe that it
+would be worthwhile to study the difference in suicide rates in 2019 and
+2021.
 
 A similar study on the relationship between location and suicide has
 been conducted, but the data was limited to regions in London and with
 the rise of social media and the global pandemic, the information may
 now be outdated (Congdon, P., 1997). In comparison, our dataset contains
-over 180 countries and the analysis focuses on 2021, which may show the
-impact of the COVID-19 pandemic on suicide rates.
-
-"The social restriction practices and policies imposed by different
-countries secondary to the COVID-19 pandemic might have negatively
-influenced the fore-said risk factors that has been indirectly led
-increased rates of suicidal attempts and deaths" (Pathirathna et al.,
-2022).
+over 150 countries and the analysis focuses on 2019 and 2021, which may
+show the impact of the COVID-19 pandemic on suicide rates.
 
 # Dataset and Data Cleaning
 
@@ -126,14 +131,14 @@ FactValueNumericLow: Low estimate
 FactValueNumericHigh: High estimate
 
 Note: The FactValueNumeric data are estimates of the number of suicides.
-"The estimates are derived from the WHO Global Health Estimates (GHE)"
-[data source]. However, some countries may not have an accurate way of
-recording the exact number of deaths, potentially leading to inaccurate
-estimations. Hence there is a high and low in the death rates. "For
+The data was obtained from the WHO Global Health Estimates (GHE), but
+some countries may not have an accurate way of recording the exact
+number of deaths, potentially leading to inaccurate estimations. Hence
+there is a high and low in the death rates. The source states, "for
 countries without high-quality death registration data, cause of death
 estimates are calculated using other data, including household surveys
 with verbal autopsy, sample or sentinel registration systems, special
-studies" [data source].
+studies" (World Health Organization, n.d.).
 
 ```{r}
 data_raw = read.csv("suicide_rate_raw.csv", header = TRUE)
